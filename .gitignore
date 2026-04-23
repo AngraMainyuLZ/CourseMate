@@ -1,0 +1,33 @@
+# 敏感信息
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets.json
+config.json
+
+# 编辑器配置
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 依赖和缓存
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 日志和临时文件
+*.log
+logs/
+tmp/
+temp/
+
+# Project data & local settings (privacy)
+data/
+extracted_images/
+sessions/
+vector_db/
+settings/
