@@ -202,32 +202,48 @@ def handle_file_checkbox_change(f_key: str, c_key: str, files: list, c: str):
 # ---------------------- System Dialogs ----------------------
 
 
-@st.dialog("⚙️ 偏好设置 / Settings", width="large")
+@st.dialog("Settings", width="large")
 def settings_dialog(agent: RAGAgent):
     settings = _get_settings()
     st.write("Configure your AI assistant.")
-    
-    with st.form("settings_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("LLM Provider")
-            new_llm_api_key = st.text_input("LLM API Key", value=settings.llm_api_key or "", type="password")
-            new_llm_base_url = st.text_input("LLM Base URL", value=settings.llm_base_url or "")
-            new_llm_model = st.text_input("LLM Chat Model", value=settings.chat_model or "qwen-plus")
-            new_vision_model = st.text_input("Vision Model", value=settings.vision_model or "qwen-vl-max")
 
-        with col2:
-            st.subheader("Embedding Provider")
-            new_emb_provider = st.selectbox(
-                "Embedding Provider",
-                options=["gemini", "openai", "custom"],
-                index=["gemini", "openai", "custom"].index(settings.embedding_provider) if settings.embedding_provider in ["gemini", "openai", "custom"] else 0
-            )
-            new_emb_api_key = st.text_input("Embedding API Key", value=settings.embedding_api_key or "", type="password")
-            new_emb_base_url = st.text_input("Embedding Base URL", value=settings.embedding_base_url or "")
-            new_emb_model = st.text_input("Embedding Model", value=settings.embedding_model or "")
-        
-        new_top_k = st.number_input("Top-K Retrievals", min_value=1, max_value=20, value=settings.top_k)
+    with st.form("settings_form"):
+        st.subheader("Runtime Controls")
+        new_top_k = st.number_input("Top-K Retrievals", min_value=1, max_value=20, value=int(settings.top_k))
+        new_quiz_question_count = st.number_input(
+            "Auto Quiz Question Count",
+            min_value=1,
+            max_value=20,
+            value=int(settings.quiz_question_count),
+        )
+        new_context_history_messages = st.number_input(
+            "Context History Messages",
+            min_value=1,
+            max_value=40,
+            value=int(settings.context_history_messages),
+            help="How many previous chat messages are sent to model each turn.",
+        )
+
+        with st.expander("API Settings (Click to Expand)", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("LLM Provider")
+                new_llm_api_key = st.text_input("LLM API Key", value=settings.llm_api_key or "", type="password")
+                new_llm_base_url = st.text_input("LLM Base URL", value=settings.llm_base_url or "")
+                new_llm_model = st.text_input("LLM Chat Model", value=settings.chat_model or "qwen-plus")
+                new_vision_model = st.text_input("Vision Model", value=settings.vision_model or "qwen-vl-max")
+                new_image_model = st.text_input("Image Model", value=settings.image_model or "dall-e-3")
+
+            with col2:
+                st.subheader("Embedding Provider")
+                new_emb_provider = st.selectbox(
+                    "Embedding Provider",
+                    options=["gemini", "openai", "custom"],
+                    index=["gemini", "openai", "custom"].index(settings.embedding_provider) if settings.embedding_provider in ["gemini", "openai", "custom"] else 0,
+                )
+                new_emb_api_key = st.text_input("Embedding API Key", value=settings.embedding_api_key or "", type="password")
+                new_emb_base_url = st.text_input("Embedding Base URL", value=settings.embedding_base_url or "")
+                new_emb_model = st.text_input("Embedding Model", value=settings.embedding_model or "")
 
         if st.form_submit_button("Save defaults"):
             updated_dict = {
@@ -235,14 +251,17 @@ def settings_dialog(agent: RAGAgent):
                 "llm_base_url": new_llm_base_url,
                 "chat_model": new_llm_model,
                 "vision_model": new_vision_model,
+                "image_model": new_image_model,
                 "embedding_provider": new_emb_provider,
                 "embedding_api_key": new_emb_api_key,
                 "embedding_base_url": new_emb_base_url,
                 "embedding_model": new_emb_model,
                 "top_k": new_top_k,
                 "history_limit": settings.history_limit,
+                "context_history_messages": new_context_history_messages,
+                "quiz_question_count": new_quiz_question_count,
                 "chunk_size": settings.chunk_size,
-                "chunk_overlap": settings.chunk_overlap
+                "chunk_overlap": settings.chunk_overlap,
             }
             updated = normalize_settings(updated_dict)
             save_settings(updated)
@@ -252,7 +271,7 @@ def settings_dialog(agent: RAGAgent):
             st.rerun()
 
 
-@st.dialog("➕ 新建课程与上传资料", width="large")
+@st.dialog("新建课程与上传资料", width="large")
 def new_course_dialog(agent: RAGAgent):
     tracker = FileTracker(str(DATA_DIR / "metadata.json"))
     st.markdown("创建一个新课程，并上传相关课件。")
@@ -378,20 +397,10 @@ def confirm_delete_dialog(session_path: Path):
     if col2.button("🚫 取消", use_container_width=True):
         st.rerun()
 
-def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]], Optional[List[str]]]:
+def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]], Optional[List[str]], bool]:
     with st.sidebar:
         st.markdown("## 📚 CourseMate")
         st.caption("Your AI Course Assistant")
-        st.divider()
-
-        # Top Action Bar
-        if st.button("⚙️ 偏好设置", use_container_width=True):
-            settings_dialog(agent)
-        if st.button("📚 课程资源管理", use_container_width=True):
-            course_management_dialog(agent)
-        if st.button("➕ 新建课程", use_container_width=True):
-            new_course_dialog(agent)
-
         st.divider()
 
         # Cascading Context Filter (Tree Checkboxes)
@@ -491,7 +500,17 @@ def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]]
                 except Exception:
                     pass
 
-    return selected_courses or None, selected_files or None
+        st.divider()
+        st.subheader("工具")
+        auto_quiz_mode = st.toggle("自动出题", key="auto_quiz_mode")
+        if st.button("⚙️ 偏好设置", use_container_width=True):
+            settings_dialog(agent)
+        if st.button("📚 课程资源管理", use_container_width=True):
+            course_management_dialog(agent)
+        if st.button("➕ 新建课程", use_container_width=True):
+            new_course_dialog(agent)
+
+    return selected_courses or None, selected_files or None, bool(auto_quiz_mode)
 
 
 def _has_any_course_files() -> bool:
@@ -503,6 +522,96 @@ def _has_any_course_files() -> bool:
         if files:
             return True
     return False
+
+
+def _parse_quiz_items(raw_text: str) -> Tuple[List[Dict[str, Any]], str]:
+    if not raw_text:
+        return [], "empty response"
+
+    payload = raw_text.strip()
+    if payload.startswith("```"):
+        payload = payload.strip("`")
+        payload = payload.replace("json", "", 1).strip()
+
+    parsed = None
+    try:
+        parsed = json.loads(payload)
+    except Exception:
+        start = payload.find("{")
+        end = payload.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                parsed = json.loads(payload[start:end + 1])
+            except Exception as exc:
+                return [], str(exc)
+        else:
+            return [], "no valid json object found"
+
+    items = parsed.get("items", []) if isinstance(parsed, dict) else []
+    if not isinstance(items, list):
+        return [], "json field 'items' is not a list"
+
+    normalized: List[Dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        q = str(item.get("q", "")).strip()
+        a = str(item.get("a", "")).strip()
+        difficulty = str(item.get("difficulty", "")).strip().lower()
+        sources = item.get("sources", [])
+        if not isinstance(sources, list):
+            sources = []
+        if q and a:
+            normalized.append(
+                {
+                    "q": q,
+                    "a": a,
+                    "difficulty": difficulty,
+                    "sources": sources,
+                }
+            )
+    return normalized, ""
+
+
+def _normalize_markdown_math(text: str) -> str:
+    text = str(text or "")
+    replacements = (
+        ("\\\\[", "\n\n$$\n"),
+        ("\\\\]", "\n$$\n\n"),
+        ("\\[", "\n\n$$\n"),
+        ("\\]", "\n$$\n\n"),
+        ("\\\\(", "$"),
+        ("\\\\)", "$"),
+        ("\\(", "$"),
+        ("\\)", "$"),
+        ("\\$", "$"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    text = text.replace("\r\n", "\n")
+    while "\n\n\n" in text:
+        text = text.replace("\n\n\n", "\n\n")
+    return text.strip()
+
+
+def _render_quiz_items(items: List[Dict[str, Any]]) -> None:
+    for i, item in enumerate(items, 1):
+        q = item.get("q", "")
+        a = item.get("a", "")
+        difficulty = item.get("difficulty", "")
+        sources = item.get("sources", [])
+        diff_label = f" ({difficulty})" if difficulty else ""
+        st.markdown(f"**Q{i}{diff_label}:**")
+        st.markdown(_normalize_markdown_math(q))
+        with st.expander(f"查看 A{i}"):
+            st.markdown(_normalize_markdown_math(a))
+            if sources:
+                st.markdown("**参考出处：**")
+                for s in sources:
+                    if isinstance(s, dict):
+                        file_name = s.get("file", "unknown")
+                        page = s.get("page", 0)
+                        st.markdown(f"- [{file_name}, p{page}]")
 
 
 def main() -> None:
@@ -525,7 +634,7 @@ def main() -> None:
         st.toast(toast)
 
     # Sidebar handling
-    course_filter, file_filter = sidebar(agent, settings)
+    course_filter, file_filter, auto_quiz_mode = sidebar(agent, settings)
 
     # Empty State Greeting
     if not st.session_state.messages:
@@ -548,7 +657,14 @@ def main() -> None:
                     st.image(base64.b64decode(message["image"]), width=300)
                 except Exception:
                     pass
-            st.markdown(message.get("content", ""))
+            if message["role"] == "assistant" and message.get("mode") == "quiz":
+                quiz_items = message.get("quiz_items", [])
+                if quiz_items:
+                    _render_quiz_items(quiz_items)
+                else:
+                    st.markdown(message.get("content", ""))
+            else:
+                st.markdown(message.get("content", ""))
             if message["role"] == "assistant" and assistant_idx < len(st.session_state.retrieved_history):
                 docs = st.session_state.retrieved_history[assistant_idx]
                 render.render_images(docs)
@@ -606,22 +722,54 @@ def main() -> None:
                 docs = []
                 st.markdown(answer)
             else:
-                history = st.session_state.messages[-7:-1]
-                with st.spinner("AI 正在重组知识脉络..."):
-                    print(f"[UI Event] Agent retrieving context with course_filter={course_filter} and file_filter={file_filter}", flush=True)
-                    stream, docs = agent.answer_question_stream(
-                        prompt, 
-                        chat_history=history, 
-                        course_names=course_filter, 
-                        filenames=file_filter, 
-                        user_image_b64=user_image_b64
-                    )
-                answer = st.write_stream(stream)
-                if docs:
-                    render.render_images(docs)
-                    render.render_sources(docs, len(st.session_state.messages))
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-            st.session_state.retrieved_history.append(docs)
+                history_window = int(settings.context_history_messages)
+                history = st.session_state.messages[-(history_window + 1):-1]
+                if auto_quiz_mode:
+                    with st.spinner("AI 正在自动出题..."):
+                        print(f"[UI Event] Agent generating quiz with course_filter={course_filter} and file_filter={file_filter}", flush=True)
+                        quiz_raw, docs = agent.generate_quiz(
+                            prompt,
+                            question_count=int(settings.quiz_question_count),
+                            chat_history=history,
+                            course_names=course_filter,
+                            filenames=file_filter,
+                        )
+                    quiz_items, parse_err = _parse_quiz_items(quiz_raw)
+                    if parse_err:
+                        answer = f"自动出题结果解析失败：{parse_err}\n\n原始输出：\n{quiz_raw}"
+                        st.markdown(answer)
+                        st.session_state.messages.append({"role": "assistant", "content": answer})
+                    else:
+                        _render_quiz_items(quiz_items)
+                        answer = f"已生成 {len(quiz_items)} 道题。"
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "content": answer,
+                                "mode": "quiz",
+                                "quiz_items": quiz_items,
+                            }
+                        )
+                    st.session_state.retrieved_history.append(docs)
+                    if docs:
+                        render.render_images(docs)
+                        render.render_sources(docs, len(st.session_state.messages))
+                else:
+                    with st.spinner("AI 正在重组知识脉络..."):
+                        print(f"[UI Event] Agent retrieving context with course_filter={course_filter} and file_filter={file_filter}", flush=True)
+                        stream, docs = agent.answer_question_stream(
+                            prompt, 
+                            chat_history=history, 
+                            course_names=course_filter, 
+                            filenames=file_filter, 
+                            user_image_b64=user_image_b64
+                        )
+                    answer = st.write_stream(stream)
+                    if docs:
+                        render.render_images(docs)
+                        render.render_sources(docs, len(st.session_state.messages))
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    st.session_state.retrieved_history.append(docs)
 
         save_session()
 
