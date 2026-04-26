@@ -50,6 +50,8 @@ class AppSettings:
     # Runtime retrieval/settings
     top_k: int = TOP_K
     history_limit: int = 5
+    context_history_messages: int = 7
+    quiz_question_count: int = 5
 
     # Ingestion settings
     chunk_size: int = CHUNK_SIZE
@@ -91,6 +93,8 @@ def normalize_settings(raw: Dict[str, Any]) -> AppSettings:
         embedding_model=str(raw.get("embedding_model", defaults.embedding_model)),
         top_k=_sanitize_int(raw.get("top_k"), defaults.top_k, 1, 50),
         history_limit=_sanitize_int(raw.get("history_limit"), defaults.history_limit, 1, 200),
+        context_history_messages=_sanitize_int(raw.get("context_history_messages"), defaults.context_history_messages, 1, 40),
+        quiz_question_count=_sanitize_int(raw.get("quiz_question_count"), defaults.quiz_question_count, 1, 20),
         chunk_size=_sanitize_int(raw.get("chunk_size"), defaults.chunk_size, 64, 8192),
         chunk_overlap=_sanitize_int(raw.get("chunk_overlap"), defaults.chunk_overlap, 0, 4096),
     )

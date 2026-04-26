@@ -204,6 +204,50 @@ class RAGAgent:
         return stream, docs
 
     # ------------------------------------------------------------------
+    def generate_quiz(
+        self,
+        query: str,
+        question_count: int = 5,
+        chat_history: Optional[List[Dict]] = None,
+        course_names: Optional[List[str]] = None,
+        filenames: Optional[List[str]] = None,
+    ) -> Tuple[str, List[Dict]]:
+        context, docs, _ = self.retrieve_context(
+            query, course_names=course_names, filenames=filenames
+        )
+        retrieval_error = getattr(self.vector_store, "last_search_error", None)
+        if retrieval_error:
+            return f"[retrieval error] {retrieval_error}", docs
+
+        user_text = prompts.QUIZ_PROMPT_TEMPLATE.format(
+            query=query,
+            question_count=int(question_count),
+            context=context or "(no context retrieved)",
+        )
+
+        messages: List[Dict] = [{"role": "system", "content": prompts.QUIZ_SYSTEM_PROMPT}]
+        if chat_history:
+            messages.extend(chat_history)
+        messages.append(
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": user_text}],
+            }
+        )
+
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.4,
+                stream=False,
+            )
+            content = resp.choices[0].message.content or ""
+            return content, docs
+        except Exception as exc:
+            return f"[error] {exc}", docs
+
+    # ------------------------------------------------------------------
     def _is_draw_intent(self, query: str) -> bool:
         lowered = query.lower()
         return any(k.lower() in lowered for k in self.draw_triggers)
