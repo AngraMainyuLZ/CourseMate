@@ -1,80 +1,76 @@
-﻿# CourseMate
+# CourseMate
 
-CourseMate is a Streamlit-based RAG assistant for course learning materials.
+[中文](README.zh-CN.md) | English
 
-It supports:
-- PDF / PPTX / DOCX / TXT ingestion
-- image extraction for PDF/PPTX pages
-- hybrid retrieval (dense + BM25 fusion)
-- source-grounded answers with file/page references
-- optional image-generation flow for draw/diagram-style requests
+## 👋 Welcome to CourseMate
 
-## Key Features
-- Multi-course filtering in sidebar (course/file level).
-- Chat with optional uploaded image.
-- Related source images + source snippets in answer panel.
-- Runtime settings panel for LLM/Embedding providers and models.
+CourseMate is a course-focused RAG assistant built with Streamlit. It helps you turn lecture notes, slides, documents, source code, and configuration files into a searchable AI learning companion.
 
-## Project Structure
-- `UI/`
-  - `app.py`: Streamlit app entry
-  - `render.py`: source/image rendering helpers
-- `rag/`
-  - `agent.py`: retrieval + prompt assembly + streaming answer
-  - `image_gen.py`: draw-intent prompt optimization + image generation
-  - `prompts.py`: system prompts and draw keywords
-- `data_pipeline/`
-  - `loader.py`: document/image loading
-  - `splitter.py`: chunking strategy
-  - `embeddings.py`: embedding client abstraction
-  - `vector_store.py`: Chroma + BM25 hybrid retrieval
-  - `tracker.py`: file hash tracking for incremental updates
-- `scripts/`
-  - `process_data.py`: build/rebuild vector index
-  - `run_streamlit.py`: start Streamlit app
-- `config.py`: paths/models/defaults
-- `core/settings.py`: app settings persistence
+Ask questions, narrow retrieval to a course or file, upload a handwritten image, inspect cited sources, and generate practice questions from your own materials.
 
-## Quick Start
-1. Create and activate virtual environment.
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-3. Configure environment variables:
-```bash
-cp .env.example .env
-```
-Then fill API settings in `.env` (or use UI settings panel after launch).
+## ✨ Highlights
 
-4. (Optional but recommended) Build index:
-```bash
-python scripts/process_data.py
-```
+- 📚 **Multi-course knowledge base**: organize materials under `data/<CourseName>/` and search by course or individual file.
+- 🔎 **Hybrid retrieval**: combines dense vector search with BM25 keyword retrieval for more robust results.
+- 🧾 **Grounded answers**: answers are generated from retrieved course context and shown with file/page source references.
+- 🖼️ **Multimodal support**: extracts images from PDF/PPTX materials and supports user-uploaded `png`, `jpg`, and `jpeg` images in chat.
+- 🧠 **Auto quiz mode**: generates structured practice questions, answers, difficulty labels, and citations from selected materials.
+- 🎨 **Diagram/image generation flow**: drawing-style requests can be converted into grounded image prompts and sent to an image model.
+- ⚙️ **Runtime settings**: configure LLM, vision model, image model, embedding provider, Top-K retrieval, and quiz size from the app.
+- 🧩 **Broad file ingestion**: supports PDF, PPTX, DOC/DOCX, text files, Markdown, JSON/YAML/TOML, web files, scripts, and common source-code formats.
 
-5. Run app:
-```bash
-python scripts/run_streamlit.py
-```
-or:
-```bash
-streamlit run UI/app.py
-```
+## 🚀 Quick Start
 
-## Data Layout
-Place course files under `data/<CourseName>/...`, for example:
+1. **Create and activate a Python environment**
 
-```text
-data/
-  Probability/
-    lec1.pdf
-    lec2.pptx
-  Signals/
-    notes.docx
-```
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
 
-## Notes
-- If data is empty, app can still start; it will ask user to upload course files before querying.
-- If retrieval call fails (e.g., invalid API), error will be shown in chat stream.
-- Sessions are saved under `sessions/`.
-- Local data/settings/vector DB are ignored by git (see `.gitignore`) to reduce leakage risk.
+2. **Install dependencies**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configure API settings**
+
+   ```bash
+   copy .env.example .env
+   ```
+
+   Fill in your model and embedding API settings in `.env`, or configure them later in the app settings panel.
+
+4. **Add course materials**
+
+   Put files under `data/<CourseName>/`, for example:
+
+   ```text
+   data/
+     Probability/
+       lecture1.pdf
+       notes.md
+     Programming/
+       demo.py
+       config.yaml
+   ```
+
+5. **Build or update the index**
+
+   ```bash
+   python scripts/process_data.py
+   ```
+
+6. **Run CourseMate**
+
+   ```bash
+   python scripts/run_streamlit.py
+   ```
+
+   Or run Streamlit directly:
+
+   ```bash
+   streamlit run UI/app.py
+   ```
+

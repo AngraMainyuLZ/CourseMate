@@ -1,12 +1,13 @@
 """Document loading and optional image extraction for CourseMate.
 
-This module turns raw course files (PDF/PPTX/DOCX/TXT) into structured
+This module turns raw course files into structured
 documents ready for splitting/embedding. Image extraction is performed for
 PDF and PPTX slides to support multimodal retrieval.
 """
 from __future__ import annotations
 
 import os
+import re
 from typing import Dict, List, Optional
 
 import base64
@@ -15,6 +16,13 @@ import fitz  # PyMuPDF
 from PyPDF2 import PdfReader
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+from data_pipeline.formats import (
+    PRESENTATION_FILE_EXTENSIONS,
+    SUPPORTED_FILE_EXTENSIONS,
+    TEXT_FILE_EXTENSIONS,
+    WORD_FILE_EXTENSIONS,
+)
 
 
 class DocumentLoader:
@@ -29,7 +37,7 @@ class DocumentLoader:
         self.images_dir = images_dir
         self.project_root = os.path.abspath(os.path.join(self.data_dir, os.pardir))
         self.extract_images = extract_images
-        self.supported_exts = supported_exts or [".pdf", ".pptx", ".docx", ".txt"]
+        self.supported_exts = {ext.lower() for ext in (supported_exts or SUPPORTED_FILE_EXTENSIONS)}
         os.makedirs(self.images_dir, exist_ok=True)
 
     # ---------------------------------------------------------------------
@@ -67,12 +75,12 @@ class DocumentLoader:
         ext = os.path.splitext(file_path)[1].lower()
         if ext == ".pdf":
             return self._load_pdf(file_path)
-        if ext == ".pptx":
+        if ext in PRESENTATION_FILE_EXTENSIONS:
             return self._load_pptx(file_path)
-        if ext == ".docx":
-            return self._wrap_single_text_chunk(file_path, self._load_docx(file_path))
-        if ext == ".txt":
-            return self._wrap_single_text_chunk(file_path, self._load_txt(file_path))
+        if ext in WORD_FILE_EXTENSIONS:
+            return self._wrap_single_text_chunk(file_path, self._load_word(file_path))
+        if ext in TEXT_FILE_EXTENSIONS:
+            return self._wrap_single_text_chunk(file_path, self._load_text_file(file_path))
 
         print(f"[loader] unsupported extension skipped: {file_path}")
         return []
@@ -154,20 +162,52 @@ class DocumentLoader:
 
         return chunks
 
-    def _load_docx(self, file_path: str) -> str:
+    def _load_word(self, file_path: str) -> str:
         try:
             return docx2txt.process(file_path)
         except Exception as exc:
-            print(f"[loader] docx read failed: {exc}")
+            print(f"[loader] word read failed via docx2txt: {exc}")
+            if os.path.splitext(file_path)[1].lower() == ".doc":
+                return self._extract_text_from_binary(file_path)
             return ""
 
-    def _load_txt(self, file_path: str) -> str:
+    def _load_text_file(self, file_path: str) -> str:
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
+            with open(file_path, "rb") as f:
+                data = f.read()
         except Exception as exc:
-            print(f"[loader] txt read failed: {exc}")
+            print(f"[loader] text read failed: {exc}")
             return ""
+
+        for encoding in ("utf-8-sig", "utf-8", "gb18030", "utf-16", "utf-16-le"):
+            try:
+                return data.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return data.decode("latin-1", errors="replace")
+
+    def _extract_text_from_binary(self, file_path: str) -> str:
+        """Best-effort fallback for legacy .doc files without extra system tools."""
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+        except Exception as exc:
+            print(f"[loader] binary word fallback failed: {exc}")
+            return ""
+
+        decoded_parts = []
+        for encoding in ("utf-16-le", "utf-8", "gb18030", "latin-1"):
+            text = data.decode(encoding, errors="ignore")
+            text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]+", " ", text)
+            text = re.sub(r"[ \t]{2,}", " ", text)
+            lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 2]
+            candidate = "\n".join(lines)
+            if candidate:
+                decoded_parts.append(candidate)
+
+        if not decoded_parts:
+            return ""
+        return max(decoded_parts, key=len)
 
     # ------------------------------------------------------------------
     # Helpers
