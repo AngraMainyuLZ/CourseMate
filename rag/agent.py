@@ -172,6 +172,7 @@ class RAGAgent:
         course_names: Optional[List[str]] = None,
         filenames: Optional[List[str]] = None,
         user_image_b64: Optional[str] = None,
+        use_visual_rag: bool = False,
     ):
         # Drawing intent delegated to image generator if available
         if self._is_draw_intent(query) and self.image_generator:
@@ -186,8 +187,35 @@ class RAGAgent:
                 yield f"[retrieval error] {retrieval_error}"
             return stream_error, docs
 
+        # If Visual RAG is enabled, clear the previously extracted small image paths
+        # to avoid sending redundant images to the LLM and wasting tokens.
+        if use_visual_rag:
+            image_paths = []
+
         messages = self._build_messages(query, context, chat_history, image_paths, user_image_b64)
         current_model = self.vision_model if (image_paths or user_image_b64) else self.model
+
+        if use_visual_rag:
+            from data_pipeline.loader import DocumentLoader
+            visual_pages = set()
+            for d in docs:
+                meta = d.get("metadata", {})
+                pdf_path = meta.get("filepath", "")
+                page_info = meta.get("page_number", 0)
+                if pdf_path and pdf_path.lower().endswith(".pdf") and page_info:
+                    visual_pages.add((pdf_path, page_info))
+                    d["metadata"]["used_visual_rag"] = True
+                    # Clear local cropped images so UI doesn't show them
+                    d["metadata"]["image_paths"] = ""
+
+            for pdf_path, page_info in visual_pages:
+                b64 = DocumentLoader.get_pdf_page_image_base64(pdf_path, page_info)
+                if b64:
+                    messages[-1]["content"].append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"}
+                    })
+                    current_model = self.vision_model
 
         def stream():
             try:

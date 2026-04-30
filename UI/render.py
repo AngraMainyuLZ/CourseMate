@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+import base64
 from typing import Dict, List
 
 import streamlit as st
 from config import IMAGES_DIR, PROJECT_ROOT
+from data_pipeline.loader import DocumentLoader
 
 
 def aggregate_docs(docs: List[Dict]) -> Dict[str, Dict]:
@@ -23,9 +25,39 @@ def aggregate_docs(docs: List[Dict]) -> Dict[str, Dict]:
     return aggregated
 
 
+@st.cache_data(show_spinner=False)
+def _get_cached_pdf_image(pdf_path: str, page: int) -> bytes:
+    try:
+        b64 = DocumentLoader.get_pdf_page_image_base64(pdf_path, page, zoom_factor=1.5)
+        if b64:
+            return base64.b64decode(b64)
+    except Exception:
+        pass
+    return b""
+
+
 def render_sources(docs: List[Dict], index: int) -> None:
     if not docs:
         return
+        
+    pages_to_render = set()
+    for doc in docs:
+        meta = doc.get('metadata', {})
+        if meta.get('used_visual_rag'):
+            pdf_path = meta.get('filepath', '')
+            page = meta.get('page_number', 0)
+            if pdf_path and page:
+                pages_to_render.add((pdf_path, page))
+                
+    if pages_to_render:
+        with st.expander("📎 View sources", expanded=False):
+            for path, page in sorted(pages_to_render):
+                img_bytes = _get_cached_pdf_image(path, page)
+                if img_bytes:
+                    fname = os.path.basename(path)
+                    st.image(img_bytes, caption=f"{fname} - Page {page}", use_container_width=True)
+        return  # Skip rendering text sources
+
     with st.expander("📎 View sources"):
         sources = aggregate_docs(docs)
         for fname, info in sources.items():
