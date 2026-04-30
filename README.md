@@ -13,7 +13,7 @@ Ask questions, narrow retrieval to a course or file, upload a handwritten image,
 - 📚 **Multi-course knowledge base**: organize materials under `data/<CourseName>/` and search by course or individual file.
 - 🔎 **Hybrid retrieval**: combines dense vector search with BM25 keyword retrieval for more robust results.
 - 🧾 **Grounded answers**: answers are generated from retrieved course context and shown with file/page source references.
-- 🖼️ **Multimodal support**: extracts images from PDF/PPTX materials and supports user-uploaded `png`, `jpg`, and `jpeg` images in chat.
+- 🖼️ **Multimodal & Visual RAG**: extracts images from PDF/PPTX materials and supports user-uploaded `png`, `jpg`, and `jpeg` images. Furthermore, an advanced **Visual RAG (PDF only)** mode lets models directly 'read' the original rendered PDF pages to flawlessly comprehend complex mathematical formulas and charts. *(Note: For PPTX slides, please export them to PDF format first before uploading to leverage this advanced feature.)*
 - 🧠 **Auto quiz mode**: generates structured practice questions, answers, difficulty labels, and citations from selected materials.
 - 🎨 **Diagram/image generation flow**: drawing-style requests can be converted into grounded image prompts and sent to an image model.
 - ⚙️ **Runtime settings**: configure LLM, vision model, image model, embedding provider, Top-K retrieval, and quiz size from the app.
@@ -42,27 +42,7 @@ Ask questions, narrow retrieval to a course or file, upload a handwritten image,
 
    Fill in your model and embedding API settings in `.env`, or configure them later in the app settings panel.
 
-4. **Add course materials**
-
-   Put files under `data/<CourseName>/`, for example:
-
-   ```text
-   data/
-     Probability/
-       lecture1.pdf
-       notes.md
-     Programming/
-       demo.py
-       config.yaml
-   ```
-
-5. **Build or update the index**
-
-   ```bash
-   python scripts/process_data.py
-   ```
-
-6. **Run CourseMate**
+4. **Run CourseMate**
 
    ```bash
    python scripts/run_streamlit.py
@@ -73,4 +53,8 @@ Ask questions, narrow retrieval to a course or file, upload a handwritten image,
    ```bash
    streamlit run UI/app.py
    ```
+
+5. **Manage courses & update index in UI**
+
+   With the Streamlit app launched, use the sidebar to create new courses, upload existing files (or manually put files under `data/<CourseName>/`), and seamlessly trigger index updates inside the interface—no CLI scripts needed!
 
