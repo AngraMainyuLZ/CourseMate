@@ -284,3 +284,32 @@ class DocumentLoader:
             return ""
         with open(image_path, "rb") as img:
             return base64.b64encode(img.read()).decode("utf-8")
+
+    @staticmethod
+    def get_pdf_page_image_base64(file_path: str, page_number: int, zoom_factor: float = 2.0) -> Optional[str]:
+        """
+        Extracts an entire PDF page as a base64 encoded PNG image for Visual RAG.
+        Note: page_number is typically 1-based (extracted by PyPDF2 previously).
+        """
+        if not os.path.exists(file_path) or not file_path.lower().endswith(".pdf"):
+            return None
+            
+        try:
+            import fitz
+            doc = fitz.open(file_path)
+            page_index = page_number - 1  # 转换回 0-based index
+            
+            if page_index < 0 or page_index >= len(doc):
+                doc.close()
+                return None
+                
+            page = doc[page_index]
+            mat = fitz.Matrix(zoom_factor, zoom_factor)
+            pix = page.get_pixmap(matrix=mat)
+            image_bytes = pix.tobytes("png")
+            doc.close()
+            
+            return base64.b64encode(image_bytes).decode("utf-8")
+        except Exception as exc:
+            print(f"[loader] failed to extract image for {file_path} page {page_number}: {exc}")
+            return None

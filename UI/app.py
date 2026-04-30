@@ -397,7 +397,7 @@ def confirm_delete_dialog(session_path: Path):
     if col2.button("🚫 取消", use_container_width=True):
         st.rerun()
 
-def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]], Optional[List[str]], bool]:
+def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]], Optional[List[str]], bool, bool]:
     with st.sidebar:
         st.markdown("## 📚 CourseMate")
         st.caption("Your AI Course Assistant")
@@ -502,6 +502,7 @@ def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]]
 
         st.divider()
         st.subheader("工具")
+        use_visual_rag = st.toggle("原图增强阅读(PDF)", key="use_visual_rag", help="开启后模型能看到包含极度复杂结构、图表和公式的高清原始页面截图数据，提升解题质量（仅限检索出的最相关的包含 PDF 页）。")
         auto_quiz_mode = st.toggle("自动出题", key="auto_quiz_mode")
         if st.button("⚙️ 偏好设置", use_container_width=True):
             settings_dialog(agent)
@@ -510,7 +511,7 @@ def sidebar(agent: RAGAgent, settings: AppSettings) -> Tuple[Optional[List[str]]
         if st.button("➕ 新建课程", use_container_width=True):
             new_course_dialog(agent)
 
-    return selected_courses or None, selected_files or None, bool(auto_quiz_mode)
+    return selected_courses or None, selected_files or None, bool(auto_quiz_mode), bool(use_visual_rag)
 
 
 def _has_any_course_files() -> bool:
@@ -634,7 +635,7 @@ def main() -> None:
         st.toast(toast)
 
     # Sidebar handling
-    course_filter, file_filter, auto_quiz_mode = sidebar(agent, settings)
+    course_filter, file_filter, auto_quiz_mode, use_visual_rag = sidebar(agent, settings)
 
     # Empty State Greeting
     if not st.session_state.messages:
@@ -762,7 +763,8 @@ def main() -> None:
                             chat_history=history, 
                             course_names=course_filter, 
                             filenames=file_filter, 
-                            user_image_b64=user_image_b64
+                            user_image_b64=user_image_b64,
+                            use_visual_rag=use_visual_rag
                         )
                     answer = st.write_stream(stream)
                     if docs:
